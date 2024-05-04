@@ -125,9 +125,9 @@ class ColoredMNIST(MultipleEnvironmentMNIST):
 
     def __init__(self, root, test_envs, hparams):
         super(ColoredMNIST, self).__init__(root, [0.1, 0.2, 0.9],
-                                         self.color_dataset, (2, 28, 28,), 2)
+                                         self.color_dataset, (3, 28, 28,), 2)
 
-        self.input_shape = (2, 28, 28,)
+        self.input_shape = (3, 28, 28,)
         self.num_classes = 2
 
     def color_dataset(self, images, labels, environment):
@@ -143,10 +143,11 @@ class ColoredMNIST(MultipleEnvironmentMNIST):
         colors = self.torch_xor_(labels,
                                  self.torch_bernoulli_(environment,
                                                        len(labels)))
-        images = torch.stack([images, images], dim=1)
+        images = torch.stack([images, images, images], dim=1) # image (n, 28, 28), output (n, 3, 28, 28)
         # Apply the color to the image by zeroing out the other color channel
         images[torch.tensor(range(len(images))), (
             1 - colors).long(), :, :] *= 0
+        images[torch.tensor(range(len(images))), 2, :, :] *= 0 # Now we return visualizable images
 
         x = images.float().div_(255.0)
         y = labels.view(-1).long()
