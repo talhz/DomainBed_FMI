@@ -68,6 +68,7 @@ class MLP(nn.Module):
 
 class ResNet(torch.nn.Module):
     """ResNet with the softmax chopped off and the batchnorm frozen"""
+    name = 'ResNet'
     def __init__(self, input_shape, hparams):
         super(ResNet, self).__init__()
         if hparams['resnet18']:
@@ -124,6 +125,7 @@ class MNIST_CNN(nn.Module):
         RotatedMNIST-100 generalization severely.
     """
     n_outputs = 128
+    name = "MNIST_CNN"
 
     def __init__(self, input_shape):
         super(MNIST_CNN, self).__init__()
