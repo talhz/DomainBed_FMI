@@ -224,6 +224,15 @@ class MultipleEnvironmentImageFolder(MultipleDomainDataset):
 
         self.input_shape = (3, 224, 224,)
         self.num_classes = len(self.datasets[-1].classes)
+        
+        for f in os.scandir(root):
+            if f.is_dir():
+                label_list = sorted([f.name for f in os.scandir(f.path) if f.is_dir()])
+                self.label_dict = {i: label_list[i] for i in range(len(label_list))}
+                break
+        
+    def get_label_dict(self):
+        return self.label_dict
 
 class VLCS(MultipleEnvironmentImageFolder):
     CHECKPOINT_FREQ = 300
