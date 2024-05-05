@@ -84,7 +84,7 @@ def attention_plot(network, dataset, layer_name, row, col, label_dict=None):
             pred = label_dict[pred.item()]
         axs[i // col, i % col].set_title(f'True label: {label}, Pred: {pred}', fontsize=8)
         axs[i // col, i % col].axis('off')
-    fig.suptitle('Attention Visualization: Training Environment', fontsize=16)
+    fig.suptitle(f'Attention Visualization: Training Environment ({args.algorithm})', fontsize=16)
     plt.show()
 
 if __name__ == "__main__":
