@@ -73,10 +73,10 @@ def attention_plot(network, dataset, layer_name, row, col, label_dict=None):
         
         return superimposed_img, pred
     
-    idx = np.random.choice(range(len(dataset[3])), row * col, replace=False)
+    idx = np.random.choice(range(len(dataset[2])), row * col, replace=False)
     fig, axs = plt.subplots(row, col, figsize=(12, 8))
     for i in range(row * col):
-        img, label = dataset[3][idx[i]]
+        img, label = dataset[2][idx[i]]
         superimposed_img, pred = super_impose(network, layer_name, img.unsqueeze(0))
         axs[i // col, i % col].imshow(superimposed_img)
         if label_dict:
@@ -84,7 +84,7 @@ def attention_plot(network, dataset, layer_name, row, col, label_dict=None):
             pred = label_dict[pred.item()]
         axs[i // col, i % col].set_title(f'True label: {label}, Pred: {pred}', fontsize=8)
         axs[i // col, i % col].axis('off')
-    fig.suptitle(f'Attention Visualization: Training Environment ({args.algorithm})', fontsize=16)
+    fig.suptitle(f'Attention Visualization: Testing Environment ({args.algorithm})', fontsize=16)
     plt.show()
 
 if __name__ == "__main__":

@@ -140,6 +140,10 @@ def _hparams(algorithm, dataset, random_seed):
         _hparam('eqrm_quantile', 0.75, lambda r: r.uniform(0.5, 0.99))
         _hparam('eqrm_burnin_iters', 2500, lambda r: 10 ** r.uniform(2.5, 3.5))
         _hparam('eqrm_lr', 1e-6, lambda r: 10 ** r.uniform(-7, -5))
+        
+    elif algorithm == 'CausalMatching':
+        _hparam('cm_lambda', 1.0, lambda r: 10**r.uniform(0, 1))
+        _hparam('group_size', 64, lambda r: int(r.uniform(64, 128)))
 
 
     # Dataset-and-algorithm-specific hparam definitions. Each block of code
