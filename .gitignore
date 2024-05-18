@@ -8,3 +8,4 @@ domainbed/attention/models_CMNIST/*
 domainbed/attention/models_OfficeHome/*
 domainbed/attention/models_unused/*
 domainbed/attention/logs_CMNIST/*
+sweep_results/*
