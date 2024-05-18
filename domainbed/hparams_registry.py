@@ -28,7 +28,7 @@ def _hparams(algorithm, dataset, random_seed):
     # Unconditional hparam definitions.
 
     _hparam('data_augmentation', False, lambda r: True) # Here I'm setting data_augmentation to False
-    _hparam('resnet18', False, lambda r: False)
+    _hparam('resnet18', True, lambda r: True) # I changed this to True
     _hparam('resnet_dropout', 0., lambda r: r.choice([0., 0.1, 0.5]))
     _hparam('class_balanced', False, lambda r: False)
     # TODO: nonlinear classifiers disabled
@@ -141,8 +141,7 @@ def _hparams(algorithm, dataset, random_seed):
         _hparam('eqrm_burnin_iters', 2500, lambda r: 10 ** r.uniform(2.5, 3.5))
         _hparam('eqrm_lr', 1e-6, lambda r: 10 ** r.uniform(-7, -5))
         
-    elif algorithm == 'CausalMatching':
-        _hparam('cm_lambda', 1.0, lambda r: 10**r.uniform(0, 1))
+    elif algorithm == 'FMI':
         _hparam('group_size', 64, lambda r: int(r.uniform(64, 128)))
 
 

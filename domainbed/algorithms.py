@@ -52,7 +52,7 @@ ALGORITHMS = [
     'CausIRL_CORAL',
     'CausIRL_MMD',
     'EQRM',
-    'CausalMatching'
+    'FMI'
 ]
 
 def get_algorithm_class(algorithm_name):
@@ -2035,72 +2035,84 @@ class EQRM(ERM):
 
         return {'loss': loss.item()}
 
-class CausalMatching(ERM):
+class FMI(ERM):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
-        super(CausalMatching, self).__init__(input_shape, num_classes, num_domains, hparams)
+        super(FMI, self).__init__(input_shape, num_classes, num_domains, hparams)
         self.group_x = {i: None for i in range(num_classes)}
         self.group_y = {i: None for i in range(num_classes)}
         self.count = {i: [0 for _ in range(num_classes)] for i in range(num_classes)}
+       
+        if torch.cuda.device_count() > 1:
+            self.device = 'cuda:0' # place network_sub to another cuda device
+            self.device_sub = 'cuda:1'
+        else:
+            self.device = 'cuda'
+            self.device_sub = 'cuda'
+            
         self.featurizer_sub = networks.Featurizer(input_shape, self.hparams)
         self.classifier_sub = networks.Classifier(
             self.featurizer.n_outputs,
             num_classes,
             self.hparams['nonlinear_classifier'])
-
-        self.network_sub = nn.Sequential(self.featurizer_sub, self.classifier_sub)
+        self.network_sub = nn.Sequential(self.featurizer_sub, self.classifier_sub).to(self.device_sub)
+        self.network.to(self.device)
         self.optimizer_sub = torch.optim.Adam(
             self.network_sub.parameters(),
             lr=self.hparams["lr"],
             weight_decay=self.hparams['weight_decay']
         )
         self.num_classes = num_classes
+        self.train_main = False
 
     def update(self, minibatches, unlabeled=None):
         objective = 0
         objective_sub = 0
         
-        all_x = torch.cat([x for x, y in minibatches])
-        all_y = torch.cat([y for x, y in minibatches])
+        all_x = torch.cat([x for x, y in minibatches]).to(self.device_sub)
+        all_y = torch.cat([y for x, y in minibatches]).to(self.device_sub)
         
         objective_sub = F.cross_entropy(self.network_sub(all_x), all_y)
 
         self.optimizer_sub.zero_grad()
         objective_sub.backward()
         self.optimizer_sub.step()
+        
+        if self.train_main:
+            preds = torch.argmax(self.network_sub(all_x), dim=1)
+                
+            # store the predicted group of each sample as well as the true label
+            for i in range(self.num_classes):
+                if self.group_x[i] is None:
+                    self.group_x[i] = all_x[preds == i].to(self.device) # TODO: change this slice expression
+                    self.group_y[i] = all_y[preds == i].to(self.device)
+                    self.count[i] = [torch.sum(self.group_y[i] == j).item() for j in range(self.num_classes)]
+                else:
+                    self.group_x[i] = torch.cat([self.group_x[i], all_x[preds == i].to(self.device)])
+                    self.group_y[i] = torch.cat([self.group_y[i], all_y[preds == i].to(self.device)])
+                    self.count[i] = [torch.sum(self.group_y[i] == j).item() for j in range(self.num_classes)]
+                    
             
-        # store the predicted group of each sample as well as the true label
-        for i in range(self.num_classes):
-            if self.group_x[i] is None:
-                self.group_x[i] = all_x[torch.argmax(self.network_sub(all_x), dim=1) == i, :, :, :]
-                self.group_y[i] = all_y[torch.argmax(self.network_sub(all_x), dim=1) == i]
-                self.count[i] = [torch.sum(self.group_y[i] == j).item() for j in range(self.num_classes)]
-            else:
-                self.group_x[i] = torch.cat([self.group_x[i], all_x[torch.argmax(self.network_sub(all_x), dim=1) == i, :, :, :]])
-                self.group_y[i] = torch.cat([self.group_y[i], all_y[torch.argmax(self.network_sub(all_x), dim=1) == i]])
-                self.count[i] = [torch.sum(self.group_y[i] == j).item() for j in range(self.num_classes)]
-                
-        
-        if min([group.shape[0] for group in self.group_x.values()]) >= self.hparams['group_size']:
-            # print(min([group.shape[0] for group in self.group_x.values()]))
-            # subsample
-            for (id, group) in self.group_x.items():
-                count = self.count[id]
-                label = self.group_y[id]
-                weights = [1 / (self.num_classes * count[label[i].item()] + 1e-6) for i in range(label.shape[0])]
-                weights = [w / sum(weights) for w in weights]
-   
-                idx = np.random.choice(group.shape[0], self.hparams['group_size'] // 2, replace=True, p = weights)
-                objective += F.cross_entropy(self.network(group[idx, :, :, :]), label[idx])
-                
-            objective /= self.num_classes
-        
-            self.optimizer.zero_grad()
-            objective.backward()
-            self.optimizer.step()
-            # flush
-            self.group_x = {i: None for i in range(self.num_classes)}
-            self.group_y = {i: None for i in range(self.num_classes)}
-            self.count = {i: [0 for _ in range(self.num_classes)] for i in range(self.num_classes)}
+            if min([group.shape[0] for group in self.group_x.values()]) >= self.hparams['group_size']:
+                # print(min([group.shape[0] for group in self.group_x.values()]))
+                # subsample
+                for (id, group) in self.group_x.items():
+                    count = self.count[id]
+                    label = self.group_y[id]
+                    weights = [1 / (self.num_classes * count[label[i].item()] + 1e-6) for i in range(label.shape[0])]
+                    weights = [w / sum(weights) for w in weights]
+    
+                    idx = np.random.choice(group.shape[0], self.hparams['group_size'] // 2, replace=True, p = weights)
+                    objective += F.cross_entropy(self.network(group[idx]), label[idx]) # TODO: change this slice expression
+                    
+                objective /= self.num_classes
+            
+                self.optimizer.zero_grad()
+                objective.backward()
+                self.optimizer.step()
+                # flush
+                self.group_x = {i: None for i in range(self.num_classes)}
+                self.group_y = {i: None for i in range(self.num_classes)}
+                self.count = {i: [0 for _ in range(self.num_classes)] for i in range(self.num_classes)}
             
         if torch.is_tensor(objective_sub):
             objective_sub = objective_sub.item()
