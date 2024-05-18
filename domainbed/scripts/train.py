@@ -48,6 +48,7 @@ if __name__ == "__main__":
         help="For domain adaptation, % of test to use unlabeled for training.")
     parser.add_argument('--skip_model_save', action='store_true')
     parser.add_argument('--save_model_every_checkpoint', action='store_true')
+    parser.add_argument('--warmup_FMI', type=int, default=-1)
     args = parser.parse_args()
 
     # If we ever want to implement checkpointing, just persist these values
@@ -89,9 +90,14 @@ if __name__ == "__main__":
     torch.manual_seed(args.seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-
-    if torch.cuda.is_available():
-        device = "cuda"
+    
+    if torch.cuda.is_available(): # allow multiple cuda devices
+        if torch.cuda.device_count() > 1:
+            device = "cuda:0"
+            device_sub = "cuda:1"
+        else:
+            device = "cuda"
+            device_sub = "cuda"
     else:
         device = "cpu"
 
@@ -177,8 +183,9 @@ if __name__ == "__main__":
 
     if algorithm_dict is not None:
         algorithm.load_state_dict(algorithm_dict)
-
-    algorithm.to(device)
+    
+    if not args.algorithm == "FMI":
+        algorithm.to(device)
 
     train_minibatches_iterator = zip(*train_loaders)
     uda_minibatches_iterator = zip(*uda_loaders)
@@ -206,7 +213,7 @@ if __name__ == "__main__":
     last_results_keys = None
     for step in range(start_step, n_steps):
         step_start_time = time.time()
-        minibatches_device = [(x.to(device), y.to(device))
+        minibatches_device = [(x.to(device_sub), y.to(device_sub)) # consistent with FMI
             for x,y in next(train_minibatches_iterator)]
         if args.task == "domain_adaptation":
             uda_device = [x.to(device)
@@ -218,45 +225,51 @@ if __name__ == "__main__":
 
         for key, val in step_vals.items():
             checkpoint_vals[key].append(val)
+        
+        if (step > args.warmup_FMI): # FMI warmup
+            try:
+                algorithm.train_main = True 
+            except AttributeError:
+                pass
 
-        if (step % checkpoint_freq == 0) or (step == n_steps - 1):
-            results = {
-                'step': step,
-                'epoch': step / steps_per_epoch,
-            }
+            if (step % checkpoint_freq == 0) or (step == n_steps - 1):
+                results = {
+                    'step': step,
+                    'epoch': step / steps_per_epoch,
+                }
 
-            for key, val in checkpoint_vals.items():
-                results[key] = np.mean(val)
+                for key, val in checkpoint_vals.items():
+                    results[key] = np.mean(val)
 
-            evals = zip(eval_loader_names, eval_loaders, eval_weights)
-            for name, loader, weights in evals:
-                acc = misc.accuracy(algorithm, loader, weights, device)
-                results[name+'_acc'] = acc
+                evals = zip(eval_loader_names, eval_loaders, eval_weights)
+                for name, loader, weights in evals:
+                    acc = misc.accuracy(algorithm, loader, weights, device)
+                    results[name+'_acc'] = acc
 
-            results['mem_gb'] = torch.cuda.max_memory_allocated() / (1024.*1024.*1024.)
+                results['mem_gb'] = torch.cuda.max_memory_allocated() / (1024.*1024.*1024.)
 
-            results_keys = sorted(results.keys())
-            if results_keys != last_results_keys:
-                misc.print_row(results_keys, colwidth=12)
-                last_results_keys = results_keys
-            misc.print_row([results[key] for key in results_keys],
-                colwidth=12)
+                results_keys = sorted(results.keys())
+                if results_keys != last_results_keys:
+                    misc.print_row(results_keys, colwidth=12)
+                    last_results_keys = results_keys
+                misc.print_row([results[key] for key in results_keys],
+                    colwidth=12)
 
-            results.update({
-                'hparams': hparams,
-                'args': vars(args)
-            })
+                results.update({
+                    'hparams': hparams,
+                    'args': vars(args)
+                })
 
-            epochs_path = os.path.join(args.output_dir, 'results.jsonl')
-            with open(epochs_path, 'a') as f:
-                f.write(json.dumps(results, sort_keys=True) + "\n")
+                epochs_path = os.path.join(args.output_dir, 'results.jsonl')
+                with open(epochs_path, 'a') as f:
+                    f.write(json.dumps(results, sort_keys=True) + "\n")
 
-            algorithm_dict = algorithm.state_dict()
-            start_step = step + 1
-            checkpoint_vals = collections.defaultdict(lambda: [])
+                algorithm_dict = algorithm.state_dict()
+                start_step = step + 1
+                checkpoint_vals = collections.defaultdict(lambda: [])
 
-            if args.save_model_every_checkpoint:
-                save_checkpoint(f'model_{args.dataset}_{args.algorithm}_step{step}.pkl')
+                if args.save_model_every_checkpoint:
+                    save_checkpoint(f'model_{args.dataset}_{args.algorithm}_step{step}.pkl')
 
     save_checkpoint(f'model_{args.dataset}_{args.algorithm}.pkl')
 
