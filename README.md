@@ -1,6 +1,6 @@
 # Reproduce Results in the Paper
 
-The code are based on [DomainBed](https://github.com/facebookresearch/DomainBed) and [Invariance unit tests](https://github.com/facebookresearch/InvarianceUnitTests). 
+This repo is based on [DomainBed](https://github.com/facebookresearch/DomainBed) and [Invariance unit tests](https://github.com/facebookresearch/InvarianceUnitTests). 
 
 ## Installing requirements
 ```bash
