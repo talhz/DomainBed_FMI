@@ -13,22 +13,33 @@ pip install -r requirements.txt
 Please follow instructions given by [DomainBed](https://github.com/facebookresearch/DomainBed) to download datasets.
 ```bash
 cd path/to/this/repo/
+export PYTHONPATH=path/to/this/repo
 python -m domainbed.scripts.sweep launch\
-       --data_dir=domainbed/data/MNIST \
-       --output_dir=sweep_out \
-       --command_launcher your_launcher --skip_confirmation --algorithms FMI --datasets ColoredMNIST \ 
+       --data_dir=/my/datasets/path\
+       --output_dir=/my/sweep/output/path\
+       --command_launcher MyLauncher\
+       --algorithms FMI --datasets ColoredMNIST\ 
        --n_hparams 1 --n_trial 10
 ```
 
 ## Running unit tests
+If one wants to run the sweep locally, use
 ```bash
+cd path/to/this/repo
 sh scripts_FMI/unit_tests/sweep.sh
+```
+
+If one is using a cluster, run 
+```bash
+cd path/to/this/repo/
+python scripts_unit_tests/sweep.py --num_iterations 10000 --num_data_seeds 50\ 
+    --num_model_seed 20 --output_dir results/ --num_samples 1000
 ```
 
 ## Plot attention maps
 ```bash
 cd path/to/this/repo
-python -m domainbed.attention.plot_attention --dataset ColoredMNIST \ 
-    --data_dir domainbed/data/MNIST --model FMI --test_envs 2 \ 
+python -m domainbed.attention.plot_attention --dataset ColoredMNIST\ 
+    --data_dir domainbed/data/MNIST --model FMI --test_envs 2\ 
     --model_path scripts_FMI/model/model_ColoredMNIST_FMI.pkl --row 2 --col 2
 ```
