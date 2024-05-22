@@ -2093,7 +2093,6 @@ class FMI(ERM):
                     
             
             if min([group.shape[0] for group in self.group_x.values()]) >= self.hparams['group_size']:
-                # print(min([group.shape[0] for group in self.group_x.values()]))
                 # subsample
                 for (id, group) in self.group_x.items():
                     count = self.count[id]
