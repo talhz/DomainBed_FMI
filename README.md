@@ -22,6 +22,11 @@ python -m domainbed.scripts.sweep launch\
        --n_hparams 1 --n_trial 10
 ```
 
+After finishing the sweep, collect the result by running 
+```bash
+python -m domainbed.scripts.collect_results\
+       --input_dir=/my/sweep/output/path
+```
 ## Running unit tests
 If one wants to run the sweep locally, use
 ```bash
@@ -34,6 +39,11 @@ If one is using a cluster, run
 cd path/to/this/repo/
 python scripts_unit_tests/sweep.py --num_iterations 10000 --num_data_seeds 50\ 
     --num_model_seed 20 --output_dir results/ --num_samples 1000
+```
+
+After finishing the sweep, collect the result by running 
+```bash
+python scripts_unit_tests/collect_results.py results/COMMIT/
 ```
 
 ## Plot attention maps
